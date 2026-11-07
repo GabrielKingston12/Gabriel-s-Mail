@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple Mailer · PHPMailer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: linear-gradient(145deg, #f1f5f9 0%, #e6edf4 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    padding: 1.5rem;
+  }
+  .card {
+    max-width: 680px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 32px;
+    box-shadow: 0 20px 35px -12px rgba(0,0,0,0.15);
+    overflow: hidden;
+  }
+  .card-header { padding: 1.8rem 2rem 1rem 2rem; border-bottom: 1px solid #e9edf2; }
+  .card-header h1 { font-size: 1.8rem; font-weight: 600; background: linear-gradient(135deg, #1e3c72, #2b3b6e); background-clip: text; -webkit-background-clip: text; color: transparent; }
+  .card-header p { color: #5b6e8c; font-size: 0.85rem; margin-top: 6px; }
+  .card-body { padding: 1.8rem 2rem 2rem 2rem; }
+  .field { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #2c3e66; }
+  input, textarea { width: 100%; padding: 12px 14px; font-family: 'Inter', monospace; font-size: 0.9rem; border: 1px solid #cfdfed; border-radius: 16px; background: #fff; outline: none; }
+  input:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+  textarea { min-height: 150px; resize: vertical; line-height: 1.5; }
+  .char-count { text-align: right; font-size: 0.7rem; color: #6c86a3; margin-top: -8px; }
+  .char-count.warning { color: #e67e22; }
+  .actions { display: flex; gap: 14px; margin-top: 28px; }
+  button { font-family: 'Inter', sans-serif; font-weight: 500; padding: 12px 20px; border-radius: 40px; cursor: pointer; border: none; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-clear { background: #f1f3f7; color: #2c3e66; border: 1px solid #dce5ef; flex: 0.4; }
+  .btn-clear:hover { background: #e6ecf3; transform: translateY(-1px); }
+  .btn-send { background: linear-gradient(105deg, #1e3c72, #2b4c8a); color: white; flex: 1; box-shadow: 0 4px 12px rgba(30,60,114,0.25); }
+  .btn-send:hover { background: linear-gradient(105deg, #14315c, #1f3e6e); transform: translateY(-1px); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e293b; color: #eef2ff; padding: 12px 24px; border-radius: 60px; font-size: 0.85rem; box-shadow: 0 8px 20px rgba(0,0,0,0.2); transition: transform 0.3s, opacity 0.3s; opacity: 0; pointer-events: none; z-index: 1000; white-space: nowrap; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  hr { margin: 18px 0 10px; border-top: 1px solid #e2e8f0; }
+  .info-note { font-size: 0.7rem; text-align: center; color: #5f7f9e; margin-top: 20px; }
+  @media (max-width: 550px) { .card-body { padding: 1.5rem; } .actions { flex-direction: column; } .btn-clear { flex: auto; } }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <h1>✉️ Gabriel's Mail</h1>
+    <p>Send real emails</p>
+  </div>
+  <div class="card-body">
+    <div class="field">
+      <label>To *</label>
+      <input type="email" id="to" placeholder="recipient@example.com" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>CC (optional)</label>
+      <input type="email" id="cc" placeholder="carbon copy@example.com">
+    </div>
+    <div class="field">
+      <label>BCC (optional)</label>
+      <input type="email" id="bcc" placeholder="blind copy@example.com">
+    </div>
+    <hr>
+    <div class="field">
+      <label>Subject</label>
+      <input type="text" id="subject" placeholder="What's this about?" maxlength="200">
+    </div>
+    <div class="field">
+      <label>Message</label>
+      <textarea id="message" placeholder="Write your message here…" maxlength="8000"></textarea>
+      <div class="char-count" id="charCounter">0 / 8000</div>
+    </div>
+    <div class="actions">
+      <button class="btn-clear" id="clearBtn">🗑️ Clear</button>
+      <button class="btn-send" id="sendBtn">📤 Send Email</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+  const msg = document.getElementById('message');
+  const counter = document.getElementById('charCounter');
+  msg.addEventListener('input', () => {
+    let len = msg.value.length;
+    counter.textContent = `${len} / 8000`;
+    if (len > 7500) counter.classList.add('warning');
+    else counter.classList.remove('warning');
+  });
+  function showToast(text, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = text;
+    toast.style.background = isError ? '#b91c1c' : '#1e293b';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3800);
+  }
+  document.getElementById('clearBtn').onclick = () => {
+    document.getElementById('to').value = '';
+    document.getElementById('cc').value = '';
+    document.getElementById('bcc').value = '';
+    document.getElementById('subject').value = '';
+    msg.value = '';
+    counter.textContent = '0 / 8000';
+    counter.classList.remove('warning');
+    showToast('All fields cleared');
+  };
+  document.getElementById('sendBtn').onclick = async () => {
+    const to = document.getElementById('to').value.trim();
+    const cc = document.getElementById('cc').value.trim();
+    const bcc = document.getElementById('bcc').value.trim();
+    const subject = document.getElementById('subject').value.trim();
+    const message = msg.value.trim();
+    if (!to) { showToast('❌ Please enter a recipient email.', true); return; }
+    const emailRe = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
+    if (!emailRe.test(to)) { showToast('❌ Invalid recipient email.', true); return; }
+    if (cc && !emailRe.test(cc)) { showToast('⚠️ Invalid CC email.', true); return; }
+    if (bcc && !emailRe.test(bcc)) { showToast('⚠️ Invalid BCC email.', true); return; }
+    if (!subject && !message) { showToast('Please enter a subject or message.', true); return; }
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    const original = btn.innerHTML;
+    btn.innerHTML = '⏳ Sending...';
+    try {
+      const res = await fetch('send.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, cc, bcc, subject, message }) });
+      const data = await res.json();
+      if (data.success) showToast(`✅ Email sent! Check Gmail Sent folder.`);
+      else showToast(`❌ Failed: ${data.error}`, true);
+    } catch(err) { showToast('❌ Network error – is PHP server running?', true); }
+    finally { btn.disabled = false; btn.innerHTML = original; }
+  };
+</script>
+</body>
+</html>
